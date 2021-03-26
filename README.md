@@ -15,6 +15,10 @@ Running PHPDocumentor or other tools with the same purpose to view the inline do
 
 This module parses and documents PHP files on the fly, so documentation doesn't have to be generated from scratch when the PHP file changes.
 
+## Module Status
+
+Alpha - try out at your own risk. Do not use on production systems!
+
 ## What it Displays
 
 The documentation viewer displays the following information:
