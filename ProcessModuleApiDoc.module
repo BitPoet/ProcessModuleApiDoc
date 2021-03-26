@@ -1,0 +1,312 @@
+<?php namespace ProcessWire;
+
+class ProcessModuleApiDoc extends Process implements ConfigurableModule {
+
+	public static function getModuleInfo() {
+		return [
+			"title"			=>	__("Module Api Doc Viewer", __FILE__),
+			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
+			"version"		=>	"0.0.1",
+			"requires"		=>	["TextformatterMarkdownExtra"],
+			"page"			=>	[
+				"name"			=>	"moduledoc",
+				"parent"		=>	"setup",
+				"title"			=>	"Module API Docs"
+			]
+		];
+	}
+	
+	public function ___execute() {
+		
+		return $this->buildModulesTable();
+		
+	}
+	
+	public function ___buildModulesTable() {
+		
+		$out = "";
+		$siteModules = [];
+		$wireModules = [];
+
+		foreach($this->modules as $module) {
+			if($this->modules->isInstalled($module)) {
+				$info = $this->modules->getModuleInfo($module);
+				$className = $module->className();
+				if(strpos($this->config->paths->$className, $this->config->paths->siteModules) === 0) {
+					$siteModules[$className] = $info;
+				} else {
+					$wireModules[$className] = $info;
+				}
+			}
+		}
+		
+		$out .= "<div style='border: 1px solid gray; padding: 0.5em;'>" .
+				"<p>" . $this->_("Click on the sheet symbol to the right of a class to view an on-the-fly generated documentation for the module.") . "</p>" .
+				"<p>" . $this->_("Once there, you can also view the documentation for other PHP / module files in the same directory.") . "</p>" .
+				"</div>";
+		
+		$out .= "<h2>" . $this->_("Site Modules") . "</h2>";
+		
+		$tbl = $this->modules->get("MarkupAdminDataTable");
+		$tbl->setEncodeEntities(false);
+		
+		$tbl->headerRow([
+			$this->_("Module"),
+			$this->_("Title"),
+			$this->_("Version"),
+			$this->_("Action")
+		]);
+		
+		foreach($siteModules as $className => $info) {
+			$tbl->row([
+				$className,
+				$info['title'],
+				$info['version'],
+				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$className}' title='" . $this->_("View") . "'> </a>"
+			]);
+		}
+		
+		$out .= $tbl->render();
+
+		$out .= "<h2>" . $this->_("Wire (Core) Modules") . "</h2>";
+		
+		$tbl = $this->modules->get("MarkupAdminDataTable");
+		$tbl->setEncodeEntities(false);
+		
+		$tbl->headerRow([
+			$this->_("Module"),
+			$this->_("Title"),
+			$this->_("Version"),
+			$this->_("Action")
+		]);
+		
+		foreach($wireModules as $className => $info) {
+			$tbl->row([
+				$className,
+				$info['title'],
+				$info['version'],
+				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$className}' title='" . $this->_("View") . "'> </a>"
+			]);
+		}
+		
+		$out .= $tbl->render();
+		
+		return $out;
+	}
+	
+	
+	public function ___executeView() {
+
+		require('ModuleApiDocGenerator.php');
+
+		$out = "";
+
+		$moduleName = $this->input->get->module;
+		$moduleFile = $this->input->get->filename;
+		
+		$modulePath = $this->config->paths->$moduleName;
+		if($moduleFile) {
+			$path = $this->config->paths->$moduleName . $moduleFile;
+		} else {
+			$path = $this->modules->getModuleFile($moduleName);
+		}
+		
+		if(!$path) {
+			return '<p><span class="fa fa-exclamation"> </span> ' . $this->_('Error: the module file could not be found!') . '</span></p>';
+		}
+		
+		$out .= "<h4>" . sprintf($this->_("Viewing Documentation for File %s"), $path) . "</h4>";
+		
+		$otherfiles = [];
+		
+		$dir = opendir($modulePath);
+		while(($file = readdir($dir)) !== false) {
+			if(
+				is_file($modulePath . $file)
+				&& preg_match('/(php|module)$/i', $file)
+				&& $file !== $moduleFile
+				&& !($moduleFile == null && substr($path, -1 * strlen($file)) == $file)
+			) {
+				$otherfiles[] = $file;
+			}
+		}
+		
+		if($otherfiles) {
+			$out .= "<div><h4>" . $this->_("Other PHP files in this module's path") . "</h4><ul>";
+			foreach($otherfiles as $file) {
+				$out .= "<li><a href='{$this->page->url}view?module={$moduleName}&filename={$file}'>{$file}</a></li>";
+			}
+			$out .= "</ul></div>";
+		}
+		
+		$gen = new ModuleApiDocGenerator($path);
+		$gen->parse();
+		
+		$tfMd = $this->modules->get('TextformatterMarkdownExtra');
+		
+		$doc = $gen->buildDoc();
+		foreach($doc as $name => $cls) {
+			
+			$out .= '<h2>' . $this->_("Generated Documentation for Class") .': ' . $cls["namespace"] . '\\' . $name . '</h2>';
+			
+			$parsed = $cls["parsedComment"];
+			if($parsed) {
+				$out .=  "<div style='border: 1px solid gray; padding: 0.5em;'>";
+				if($parsed["summary"]) {
+					$out .= "<h3>" . $parsed["summary"] . "</h3>";
+				}
+				if($parsed["description"]) {
+					$out .= "<p>" . $tfMd->markdown($parsed["description"]) . "</p>";
+				}
+				$out .= "</div>";
+			}
+						
+			$out .= "<h3>" . $this->_("Properties") . "</h3>";
+			if(count($cls["properties"])) {
+				$tbl = $this->modules->get("MarkupAdminDataTable");
+				$tbl->setEncodeEntities(false);
+				$tbl->headerRow([
+					$this->_("Property"),
+	//				$this->_("Visibility"),
+					$this->_("Static"),
+	//				$this->_("Type"),
+					$this->_("Description")
+				]);
+				foreach($cls["properties"] as $prop) {
+					
+					if($prop["visibility"] != "public") continue;
+					
+					$parsed = $prop["parsedComment"];
+					$tbl = $tbl->row([
+						'<strong>$' . $prop["name"] . "</strong>",
+	//					$prop["visibility"],
+						$prop["scope"],
+	//					$prop["type"],
+						$parsed ? ("<strong>" . $parsed["summary"] . "</strong>" . ($parsed["description"] ? "<br>" . $tfMd->markdown($parsed["description"]) : "")) : ""
+					], ['separator' => true, 'class' => 'rowdarker']);
+				}
+				$out .= $tbl->render();
+			} else {
+				$out .= "<p>" . $this->_("No properties defined") . "</p>";
+			}
+			
+			$hooks = [];
+
+			$out .= "<h3>" . $this->_("Methods") . "</h3>";
+			$tbl = $this->modules->get("MarkupAdminDataTable");
+			$tbl->setEncodeEntities(false);
+			$tbl->headerRow([
+				$this->_("Method"),
+				$this->_("Static"),
+				$this->_("Description")
+			]);
+			foreach($cls["methods"] as $meth) {
+				
+				if($meth["visibility"] != "public") continue;
+				if(substr($meth["name"], 0, 3) == '___') {
+					$hooks[] = $meth;
+					continue;
+				}
+
+				$parsed = $meth["parsedComment"];
+				$tbl->row([
+					"<strong>" . $meth["name"] . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
+					$meth["scope"],
+					$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+				], ['separator' => true, 'class' => 'rowdarker']);
+				
+				if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
+					$tbl->row([
+						'',
+						$this->_("returns:"),
+						$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
+					]);
+				}
+				
+				if($parsed && $parsed["params"] && count($parsed["params"]) > 0) {
+					foreach($parsed["params"] as $prm) {
+						$tbl->row([
+							'',
+							$this->_("argument:"),
+							" <em>" . $prm["type"] . "</em> <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
+						]);
+					}
+				}
+			}
+			$out .= $tbl->render();
+
+			if(count($hooks)) {
+				$out .= "<h3>" . $this->_("Hookable Methods") . "</h3>";
+				$tbl = $this->modules->get("MarkupAdminDataTable");
+				$tbl->setEncodeEntities(false);
+				$tbl->headerRow([
+					$this->_("Method"),
+					$this->_("Static"),
+					$this->_("Description")
+				]);
+				foreach($hooks as $meth) {
+					
+					$parsed = $meth["parsedComment"];
+					$tbl->row([
+						"<strong>" . substr($meth["name"], 3) . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
+						$meth["scope"],
+						$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+					], ['separator' => true, 'class' => 'rowdarker']);
+
+					if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
+						$tbl->row([
+							'',
+							$this->_("return:"),
+							$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
+						]);
+					}
+					
+					if($parsed && $parsed["params"] && count($parsed["params"]) > 0) {
+						foreach($parsed["params"] as $prm) {
+							$tbl->row([
+								'',
+								$this->_("argument:"),
+								" <em>" . $prm["type"] . "</em> <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
+							]);
+						}
+					}
+				}
+				$out .= $tbl->render();
+			}
+
+		}
+		
+		return $out;
+	}
+	
+	protected function renderArgString($params) {
+		return implode(', ', array_map(
+			function($param) {
+				return "<em>" . $param["type"] . "</em>" .
+					   ' <span style="color: blue;">$' . $param["name"] . "</span>" . ($param["default"] ? " = " . $param["default"] : "");
+			},
+			$params
+		));
+	}
+	
+	
+	public static function getModuleConfigInputfields($data) {
+		$wrap = new InputfieldWrapper();
+		
+		$f = wire('modules')->get("InputfieldMarkup");
+		$f->title = __("Install php-parser before usage!", __FILE__);
+		$f->attr(
+			'value',
+			__("Before using this module, you have to go into the module directory in a shell and execute 'composer update'.", __FILE__) . "\n"
+			. sprintf(__("This will install the necessary [PHP-Parser](%s) package.", __FILE__), "https://github.com/nikic/PHP-Parser") . "\n"
+			. "\n"
+			. __("It is recommended to install this module in *development environments* only!")
+		);
+		$f->set("textformatters", ["TextformatterMarkdownExtra"]);
+		
+		$wrap->append($f);
+		
+		return $wrap;
+	}
+	
+}
