@@ -46,6 +46,14 @@ This module ships with a composer.json file for PHP-Parser, so installation shou
 - Click "Install" for ProcessModuleApiDocs (Module Api Doc Viewer) from the Site modules
 - Go to "Setup" -> "Module API Docs" and enjoy
 
+## Overview
+
+![Screenshot over over page](https://raw.githubusercontent.com/BitPoet/bitpoet.github.io/master/img/apidocs1.png)
+
+## Documentation View
+
+![Screenshot of documentation view](https://raw.githubusercontent.com/BitPoet/bitpoet.github.io/master/img/apidocs2-view.png)
+
 ## Technical Stuff
 
 The module uses PHP-Parser behind the scenes to create an abstract syntax tree for the selected PHP file. That syntax tree is then walked and normalized to create a representation of namespaces, classes, methods and properties. Additionally, comments are parsed in PHP Doc style.
