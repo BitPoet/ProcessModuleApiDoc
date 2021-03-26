@@ -15,9 +15,20 @@ Running PHPDocumentor or other tools with the same purpose to view the inline do
 
 This module parses and documents PHP files on the fly, so documentation doesn't have to be generated from scratch when the PHP file changes.
 
+## What it Displays
+
+The documentation viewer displays the following information:
+
+- Classes
+- Public class properties with default value types
+- Public class methods with return values and arguments (name, type, default value), and whether a method is static
+- Hookable methods with the same information as methods
+
+For each of those, any summary and description found in PHP Doc style comments is also displayed. Descriptions containing markdown are formatted accordingly.
+
 ## Downsides
 
-There aren't any links and dependencies between files and classes. That part is what makes the "grown up" tools complicated, slow and memory intensive. This module is intended as a lean solution to take a quick peek at properties, methods and hooks without having to dig through the source code.
+There aren't any links and dependencies between files and classes to see. That part is what makes the "grown up" tools complicated, slow and memory intensive. This module is intended as a lean solution to take a quick peek at properties, methods and hooks without having to dig through the source code.
 
 ## Installation
 
