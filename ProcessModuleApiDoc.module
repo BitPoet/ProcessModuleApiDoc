@@ -229,7 +229,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					$out .= "<h3>" . $parsed["summary"] . "</h3>";
 				}
 				if($parsed["description"]) {
-					$out .= "<p>" . $tfMd->markdown($parsed["description"]) . "</p>";
+					$out .= "<p class='markdown-wrap'>" . $tfMd->markdown($parsed["description"]) . "</p>";
 				}
 				$out .= "</div>";
 			}
@@ -255,7 +255,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 	//					$prop["visibility"],
 						$prop["scope"],
 	//					$prop["type"],
-						$parsed ? ("<strong>" . $parsed["summary"] . "</strong>" . ($parsed["description"] ? "<br>" . $tfMd->markdown($parsed["description"]) : "")) : ""
+						$parsed ? ("<strong>" . $parsed["summary"] . "</strong>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]). "</p>" : "")) : ""
 					], ['separator' => true, 'class' => 'rowdarker']);
 				}
 				$out .= $tbl->render();
@@ -285,7 +285,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				$tbl->row([
 					"<strong>" . $meth["name"] . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
 					$meth["scope"],
-					$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+					$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
 				], ['separator' => true, 'class' => 'rowdarker']);
 				
 				if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
@@ -323,7 +323,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					$tbl->row([
 						"<strong>" . substr($meth["name"], 3) . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
 						$meth["scope"],
-						$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+						$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
 					], ['separator' => true, 'class' => 'rowdarker']);
 
 					if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
