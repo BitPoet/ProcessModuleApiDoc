@@ -3,6 +3,6 @@ tr.rowdarker {
 	border-top:			1px solid black !important;
 }
 
-p.markdown-wrap > p {
+.markdown-wrap > p {
 	white-space: pre-line;
 }

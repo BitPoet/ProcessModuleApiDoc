@@ -1,5 +1,22 @@
 <?php namespace ProcessWire;
 
+/**
+ * Module Api Doc Viewer
+ *
+ * Copyright 2021 by BitPoet
+ * https://github.com/BitPoet
+ *
+ * Licensed under the MIT license.
+ * https://raw.githubusercontent.com/BitPoet/ProcessModuleApiDoc/main/LICENSE
+ *
+ * This module relies on composer package PHP-Parser which needs to be installed from the command line.
+ * https://github.com/nikic/PHP-Parser
+ * PHP-Parser is licensed under the terms of the BSD 3-Clause "New" or "Revised" License.
+ *
+ * ToDo:
+ * This module could do with separating code and HTML.
+ */
+ 
 class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 
 	public static function getModuleInfo() {
@@ -95,6 +112,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$this->_("Action")
 		]);
 		
+		ksort($siteModules);
 		foreach($siteModules as $className => $info) {
 			$tbl->row([
 				$className,
@@ -118,6 +136,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$this->_("Action")
 		]);
 		
+		ksort($wireModules);
 		foreach($wireModules as $className => $info) {
 			$tbl->row([
 				$className,
@@ -224,12 +243,12 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			
 			$parsed = $cls["parsedComment"];
 			if($parsed) {
-				$out .=  "<div style='border: 1px solid gray; padding: 0.5em;'>";
+				$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
 				if($parsed["summary"]) {
 					$out .= "<h3>" . $parsed["summary"] . "</h3>";
 				}
 				if($parsed["description"]) {
-					$out .= "<p class='markdown-wrap'>" . $tfMd->markdown($parsed["description"]) . "</p>";
+					$out .= "" . $tfMd->markdown($parsed["description"]) . "";
 				}
 				$out .= "</div>";
 			}

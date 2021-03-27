@@ -9,6 +9,79 @@ use PhpParser\ParserFactory;
 
 /**
  * PHP Api Documentation Generator
+ *
+ * This is a helper class. It does not render the final documentation,
+ * but parses the source and comments to build a slim tree with all
+ * information.
+ *
+ * Ideally, this tree is used together with a templating system.
+ *
+ * Usage:
+ * ```php
+ * // Create a generator
+ * $generator = new ModuleApiDocGenerator();
+ *
+ * // Parse source file, e.g. this classes file itself:
+ * $generator->parse("./ModuleApiDocGenerator.php');
+ *
+ * // Generate class documentation tree:
+ * $classes = $generator->buildDoc();
+ * ```
+ *
+ * The generated tree is an associative array with the following structure:
+ *
+ * ```php
+ * [
+ *   "classname" => [
+ *     "namespace"       => string,
+ *     "comment"         => string,		// The original comment, unformatted
+ *
+ *     // The phpdoc information extracted from the comment
+ *     "parsedComment"   => Array,      // Parsed phpdoc information, see further down
+ *
+ *     // Information about methods, parsed directly from the source
+ *     "methods"       => [
+ *       "METHODNAME"    => [
+ *         "name"          => string,
+ *         "type"          => string, // Return type if declared in the source
+ *         "visibility"    => string, // public/protected/private
+ *         "scope"         => string, // empty or "static"
+ *         // This is the arguments definition parsed from the source, not from
+ *         // the phpdoc comment:
+ *         "params"        => [[
+ *           "type"          => string,
+ *           "name"          => string,
+ *           "default"       => string
+ *         ], ...],
+ *         "comment"       => string, // The original comment, unformatted,
+ *         "parsedComment" => Array   // Parsed phpdoc information, see further down
+ *       ],
+ *       ...
+ *     ]
+ *   ],
+ *   ...
+ * ];
+ * ```
+ *
+ * Each parsed comment (for class, method, property) has this structure:
+ *
+ * ```php
+ * [
+ *   "summary"         => string,	// first line of the comment, the summary line
+ *   "description"     => string,   // further lines in the comment, the description part
+ *   // Return value documented with @eturn, may be null:
+ *   "returns"         => [
+ *     "type"            => string,
+ *     "text"            => string, // Return value description, may be empty
+ *   ],
+ *   // Arguments documented with @param
+ *   "params"         => [
+ *     "type"           => string, // Argument type, may be empty
+ *     "name"           => string, // Argument name, may be empty
+ *     "text"			=> string, // Return value description, may be empty
+ *   ]
+ * ];
+ * ```
  */
 class ModuleApiDocGenerator {
 
@@ -22,6 +95,7 @@ class ModuleApiDocGenerator {
 	 * Constructor
 	 *
 	 * @param string $file Pass the full path to the PHP file you want to document
+	 * @return ModuleApiDocGenerator $this
 	 */
 	public function __construct(string $file) {
 		$this->filename = $file;
@@ -31,6 +105,8 @@ class ModuleApiDocGenerator {
 	 * The parse function
 	 *
 	 * Parses the source code and creates an abstract syntax tree (AST).
+	 *
+	 * @return array The AST
 	 */
 	public function parse() {
 		$traverser = new NodeTraverser;
@@ -48,8 +124,17 @@ class ModuleApiDocGenerator {
 	 * Build the documentation tree.
 	 *
 	 * You need to run parse() first!
+	 *
+	 * @return array The documentation tree
 	 */
 	public function buildDoc() {
+		
+		if(! $this->ast) {
+			return [
+				"error"		=>	"You need to run parse() before buildDoc()!"
+			];
+		}
+		
 		foreach($this->ast as $ast) {
 			if($this->ast[0] instanceof \PhpParser\Node\Stmt\Namespace_) {
 				$ns = implode('\\', $ast->name->parts);
@@ -310,9 +395,11 @@ class ModuleApiDocGenerator {
 	 * Dump the AST
 	 *
 	 * Only for debugging purposes.
+	 *
+	 * @return string
 	 */
 	public function dump() {
-		echo $dumper->dump($this->ast);
+		return $dumper->dump($this->ast);
 	}
 	
 }
