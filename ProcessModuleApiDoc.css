@@ -3,6 +3,14 @@ tr.rowdarker {
 	border-top:			1px solid black !important;
 }
 
-.markdown-wrap > p {
+.markdown-wrap > p, .mad-todo {
 	white-space: pre-line;
+}
+
+.mad-todo ul, .mad-todo li {
+	line-height: 1em;
+}
+
+.mad-todo li > p {
+	margin-bottom: 0;
 }

@@ -241,14 +241,14 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			
 			$out .= '<h2>' . $this->_("Generated Documentation for Class") .': ' . $cls["namespace"] . '\\' . $name . '</h2>';
 			
-			$parsed = $cls["parsedComment"];
-			if($parsed) {
+			$clsParsed = $cls["parsedComment"];
+			if($clsParsed) {
 				$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
-				if($parsed["summary"]) {
-					$out .= "<h3>" . $parsed["summary"] . "</h3>";
+				if($clsParsed["summary"]) {
+					$out .= "<h3>" . $clsParsed["summary"] . "</h3>";
 				}
-				if($parsed["description"]) {
-					$out .= "" . $tfMd->markdown($parsed["description"]) . "";
+				if($clsParsed["description"]) {
+					$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
 				}
 				$out .= "</div>";
 			}
@@ -366,6 +366,14 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				$out .= $tbl->render();
 			}
 
+			if($clsParsed && $clsParsed["todo"]) {
+				$out .= "<div class='mad-todo'>"
+						. "<h3>" . $this->_("Open todos") . "</h3><ul>"
+						. implode("\n", array_map(function($line) use($tfMd) {
+							return "<li>" . $tfMd->markdown(htmlentities($line)) . "</li>";
+						}, $clsParsed["todo"]))
+						. "</ul></div>";
+			}
 		}
 		
 		return $out;
