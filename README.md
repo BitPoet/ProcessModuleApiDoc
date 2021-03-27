@@ -39,7 +39,7 @@ There aren't any links and dependencies between files and classes to see. That p
 
 ## Good to know
 
-This module is not a perfect replacement for the API Reference included with the commercial ProDevTools module! Parts of the inline documentation used to assemble the official API reference cannot be parsed by this module, so they aren't displayed.
+This module is not a perfect replacement for the API Reference included with the commercial ProDevTools module! Parts of the inline documentation used to assemble the official API reference cannot be parsed by this module, so they aren't displayed. If you are a professional ProcessWire developer and rely heavily on the intricacies of the official API, the Pro module will be much more convenient to browse the ProcessWire Core documentation.
 
 This module takes a one-size-fits-all approach and is because of that quite selective in what information it extracts (and can extract) from the inline docs.
 
