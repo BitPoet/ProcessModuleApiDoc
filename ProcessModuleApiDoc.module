@@ -26,7 +26,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.0.3",
+			"version"		=>	"0.0.6",
 			"requires"		=>	["TextformatterMarkdownExtra"],
 			"page"			=>	[
 				"name"			=>	"moduledoc",
@@ -63,10 +63,15 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		$fCore->attr('name', 'coreclasses');
 		$fCore->attr('value', $this->buildCoreTable());
 
+		$fTpls = $this->wire('modules')->get("InputfieldMarkup");
+		$fTpls->attr('name', 'templates');
+		$fTpls->attr('value', $this->buildTemplatesTable($this->input->get->recurse));
+
 		return $this->modules->get('JqueryWireTabs')->render([
 			$this->_("Installed Modules")		=>	$fMods->render(),
 			$this->_("Uninstalled Modules")		=>	$uMods->render(),
-			$this->_("Core Classes")			=>	$fCore->render()
+			$this->_("Core Classes")			=>	$fCore->render(),
+			$this->_("Template Files")			=>	$fTpls->render()
 		]);
 	}
 	
@@ -218,13 +223,78 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			if(in_array($path, $this->seenPaths))
 				continue;
 			
-			echo "\n<!-- PATH: $path -->\n";
-			
 			$files[$info->getFilename()] = $path;
 		}
 		
 		return $files;
 	}
+	
+	
+	public function ___buildTemplatesTable($recursive = false) {
+		
+		$files = [];
+		
+		if($recursive) {
+			$directory = new \RecursiveDirectoryIterator($this->config->paths->templates);
+			$iterator = new \RecursiveIteratorIterator($directory);
+
+			foreach ($iterator as $info) {
+				
+				if($info->isDir() || substr(strtolower($info->getFilename()), -4) !== '.php')
+					continue;
+				
+				$path = $info->getPath() . "/";
+				
+				if(strtolower(substr($_SERVER['OS'], 0, 3)) === 'win')
+				$path = str_replace('\\', '/', $path);
+				
+				$files[] = [$path, $info->getFilename()];
+			}
+		} else {
+			$path = $this->config->paths->templates;
+			$dir = opendir($path);
+			while(($file = readdir($dir)) !== false) {
+				if(substr($file,0,1) !== '.' && is_file($path . $file) && substr($file, -4) === '.php') {
+					$files[] = [$path, $file];
+				}
+			}
+		}
+		
+		usort($files, function($a, $b) {
+			$ord = strnatcmp($a[0], $b[0]);
+			if($ord == 0) {
+				$ord = strnatcmp($a[1], $b[1]);
+			}
+			return $ord;
+		});
+		
+		$tbl = $this->modules->get("MarkupAdminDataTable");
+		$tbl->setEncodeEntities(false);
+		
+		$tbl->headerRow([
+			$this->_("File"),
+			$this->_("Action")
+		]);
+
+		$oldPath = "";
+		
+		foreach($files as $f) {
+			if($oldPath !== $f[0]) {
+				$tbl->row([
+					$this->_("Path") . ": " . $f[0],
+					''
+				], ['class' => 'rowdarker']);
+			}
+			$tbl->row([
+				$f[1],
+				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$f[0]}&filename={$f[1]}' title='" . $this->_("View") . "'> </a>"
+			]);
+			$oldPath = $f[0];
+		}
+
+		return $tbl->render();
+	}
+	
 	
 	public function ___buildCoreTable() {
 		$out = "";
@@ -319,96 +389,86 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		$doc = $gen->buildDoc();
 		foreach($doc as $name => $cls) {
 			
-			$out .= '<h2>' . $this->_("Generated Documentation for Class") .': ' . $cls["namespace"] . '\\' . $name . '</h2>';
-			
-			$clsParsed = $cls["parsedComment"];
-			if($clsParsed) {
-				$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
-				if($clsParsed["summary"]) {
-					$out .= "<h3>" . $clsParsed["summary"] . "</h3>";
-				}
-				if($clsParsed["description"]) {
-					$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
-				}
-				$out .= "</div>";
-			}
-						
-			$out .= "<h3>" . $this->_("Properties") . "</h3>";
-			if(count($cls["properties"])) {
-				$tbl = $this->modules->get("MarkupAdminDataTable");
-				$tbl->setEncodeEntities(false);
-				$tbl->headerRow([
-					$this->_("Property"),
-	//				$this->_("Visibility"),
-					$this->_("Static"),
-	//				$this->_("Type"),
-					$this->_("Description")
-				]);
-				foreach($cls["properties"] as $prop) {
-					
-					if($prop["visibility"] != "public") continue;
-					
-					$parsed = $prop["parsedComment"];
-					$tbl = $tbl->row([
-						'<strong>$' . $prop["name"] . "</strong>",
-	//					$prop["visibility"],
-						$prop["scope"],
-	//					$prop["type"],
-						$parsed ? ("<strong>" . $parsed["summary"] . "</strong>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]). "</p>" : "")) : ""
-					], ['separator' => true, 'class' => 'rowdarker']);
-				}
-				$out .= $tbl->render();
-			} else {
-				$out .= "<p>" . $this->_("No properties defined") . "</p>";
-			}
-			
-			$hooks = [];
-
-			$out .= "<h3>" . $this->_("Methods") . "</h3>";
-			$tbl = $this->modules->get("MarkupAdminDataTable");
-			$tbl->setEncodeEntities(false);
-			$tbl->headerRow([
-				$this->_("Method"),
-				$this->_("Static"),
-				$this->_("Description")
-			]);
-			foreach($cls["methods"] as $meth) {
+			if($name === "NOCLASS") {
+				// These are functions defined without a surrounding class
+				$out .= '<h2>' . $this->_("Generated Documentation for File") . '</h2>';
 				
-				if($meth["visibility"] != "public") continue;
-				if(substr($meth["name"], 0, 3) == '___') {
-					$hooks[] = $meth;
-					continue;
-				}
-
-				$parsed = $meth["parsedComment"];
-				$tbl->row([
-					"<strong>" . $meth["name"] . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
-					$meth["scope"],
-					$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
-				], ['separator' => true, 'class' => 'rowdarker']);
-				
-				if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
-					$tbl->row([
-						'',
-						$this->_("returns:"),
-						$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
-					]);
-				}
-				
-				if($parsed && $parsed["params"] && count($parsed["params"]) > 0) {
-					foreach($parsed["params"] as $prm) {
-						$tbl->row([
-							'',
-							$this->_("argument:"),
-							" <em>" . $prm["type"] . "</em> <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
-						]);
+				$clsParsed = $cls["parsedComment"];
+				if($clsParsed) {
+					$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
+					if($clsParsed["summary"]) {
+						$out .= "<h3>" . $clsParsed["summary"] . "</h3>";
 					}
+					if($clsParsed["description"]) {
+						$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
+					}
+					$out .= "</div>";
 				}
-			}
-			$out .= $tbl->render();
 
-			if(count($hooks)) {
-				$out .= "<h3>" . $this->_("Hookable Methods") . "</h3>";
+				$out .= "<h3>" . $this->_("Functions") . "</h3>";
+				
+				if(count($cls["functions"])) {
+					$tbl = $this->modules->get("MarkupAdminDataTable");
+					$tbl->setEncodeEntities(false);
+					$tbl->headerRow([
+						$this->_("Function"),
+						$this->_("Description")
+					]);
+					foreach($cls["functions"] as $func) {
+						$parsed = $func["parsedComment"];
+						$tbl->row([
+							"<strong>" . $func["name"] . "</strong>( " . $this->renderArgString($func["params"]) . " )",
+							$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+						], ['separator' => true, 'class' => 'rowdarker']);
+						
+					}
+					$out .= $tbl->render();
+				}
+				
+			} else {
+				// A regular class
+				$out .= '<h2>' . $this->_("Generated Documentation for Class") .': ' . $cls["namespace"] . '\\' . $name . '</h2>';
+				
+				$clsParsed = $cls["parsedComment"];
+				if($clsParsed) {
+					$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
+					if($clsParsed["summary"]) {
+						$out .= "<h3>" . $clsParsed["summary"] . "</h3>";
+					}
+					if($clsParsed["description"]) {
+						$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
+					}
+					$out .= "</div>";
+				}
+							
+				$out .= "<h3>" . $this->_("Properties") . "</h3>";
+				if(count($cls["properties"])) {
+					$tbl = $this->modules->get("MarkupAdminDataTable");
+					$tbl->setEncodeEntities(false);
+					$tbl->headerRow([
+						$this->_("Property"),
+						$this->_("Static"),
+						$this->_("Description")
+					]);
+					foreach($cls["properties"] as $prop) {
+						
+						if($prop["visibility"] != "public") continue;
+						
+						$parsed = $prop["parsedComment"];
+						$tbl = $tbl->row([
+							'<strong>$' . $prop["name"] . "</strong>",
+							$prop["scope"],
+							$parsed ? ("<strong>" . $parsed["summary"] . "</strong>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]). "</p>" : "")) : ""
+						], ['separator' => true, 'class' => 'rowdarker']);
+					}
+					$out .= $tbl->render();
+				} else {
+					$out .= "<p>" . $this->_("No properties defined") . "</p>";
+				}
+				
+				$hooks = [];
+
+				$out .= "<h3>" . $this->_("Methods") . "</h3>";
 				$tbl = $this->modules->get("MarkupAdminDataTable");
 				$tbl->setEncodeEntities(false);
 				$tbl->headerRow([
@@ -416,19 +476,25 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					$this->_("Static"),
 					$this->_("Description")
 				]);
-				foreach($hooks as $meth) {
+				foreach($cls["methods"] as $meth) {
 					
+					if($meth["visibility"] != "public") continue;
+					if(substr($meth["name"], 0, 3) == '___') {
+						$hooks[] = $meth;
+						continue;
+					}
+
 					$parsed = $meth["parsedComment"];
 					$tbl->row([
-						"<strong>" . substr($meth["name"], 3) . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
+						"<strong>" . $meth["name"] . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
 						$meth["scope"],
 						$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
 					], ['separator' => true, 'class' => 'rowdarker']);
-
+					
 					if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
 						$tbl->row([
 							'',
-							$this->_("return:"),
+							$this->_("returns:"),
 							$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
 						]);
 					}
@@ -444,15 +510,54 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					}
 				}
 				$out .= $tbl->render();
-			}
 
-			if($clsParsed && $clsParsed["todo"]) {
-				$out .= "<div class='mad-todo'>"
-						. "<h3>" . $this->_("Open todos") . "</h3><ul>"
-						. implode("\n", array_map(function($line) use($tfMd) {
-							return "<li>" . $tfMd->markdown(htmlentities($line)) . "</li>";
-						}, $clsParsed["todo"]))
-						. "</ul></div>";
+				if(count($hooks)) {
+					$out .= "<h3>" . $this->_("Hookable Methods") . "</h3>";
+					$tbl = $this->modules->get("MarkupAdminDataTable");
+					$tbl->setEncodeEntities(false);
+					$tbl->headerRow([
+						$this->_("Method"),
+						$this->_("Static"),
+						$this->_("Description")
+					]);
+					foreach($hooks as $meth) {
+						
+						$parsed = $meth["parsedComment"];
+						$tbl->row([
+							"<strong>" . substr($meth["name"], 3) . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
+							$meth["scope"],
+							$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+						], ['separator' => true, 'class' => 'rowdarker']);
+
+						if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
+							$tbl->row([
+								'',
+								$this->_("return:"),
+								$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
+							]);
+						}
+						
+						if($parsed && $parsed["params"] && count($parsed["params"]) > 0) {
+							foreach($parsed["params"] as $prm) {
+								$tbl->row([
+									'',
+									$this->_("argument:"),
+									" <em>" . $prm["type"] . "</em> <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
+								]);
+							}
+						}
+					}
+					$out .= $tbl->render();
+				}
+
+				if($clsParsed && $clsParsed["todo"]) {
+					$out .= "<div class='mad-todo'>"
+							. "<h3>" . $this->_("Open todos") . "</h3><ul>"
+							. implode("\n", array_map(function($line) use($tfMd) {
+								return "<li>" . $tfMd->markdown(htmlentities($line)) . "</li>";
+							}, $clsParsed["todo"]))
+							. "</ul></div>";
+				}
 			}
 		}
 		
