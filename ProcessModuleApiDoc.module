@@ -39,11 +39,39 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		];
 	}
 	
+	/**
+	 * Module initialization
+	 *
+	 * Loads JqueryWireTabs and fills header templates for MarkupAdminDataTable
+	 */
 	public function init() {
 		parent::init();
 		$this->wire('modules')->get("JqueryWireTabs");
+		
+		$this->set("headerTemplateModules", [
+			$this->_("Module"),
+			$this->_("Title"),
+			$this->_("Version"),
+			$this->_("Action")
+		]);
+		$this->set("headerTemplateFiles", [
+			$this->_("File"),
+			$this->_("Action")
+		]);
+		$this->set("headerTemplateMethods", [
+			$this->_("Property"),
+			$this->_("Static"),
+			$this->_("Description")
+		]);
+		$this->set("headerTemplateFunctions", [
+			$this->_("Function"),
+			$this->_("Description")
+		]);
 	}
 
+	/**
+	 * Render the documentation link for the passed class / filename with the passed hover title
+	 */
 	protected function docLink($classname, $filename, $title) {
 		return sprintf(
 			$this->fileDocLinkTemplate,
@@ -64,21 +92,13 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 	public function ___execute() {
 		
 		// Installed Modules
-		$fMods = $this->wire('modules')->get("InputfieldMarkup");
-		$fMods->attr('name', 'installedmodules');
-		$fMods->attr('value', $this->buildModulesTable());
-		
-		$uMods = $this->wire('modules')->get("InputfieldMarkup");
-		$uMods->attr('name', 'uninstalledmodules');
-		$uMods->attr('value', $this->buildUninstalledModulesTable());
-
-		$fCore = $this->wire('modules')->get("InputfieldMarkup");
-		$fCore->attr('name', 'coreclasses');
-		$fCore->attr('value', $this->buildCoreTable());
-
-		$fTpls = $this->wire('modules')->get("InputfieldMarkup");
-		$fTpls->attr('name', 'templates');
-		$fTpls->attr('value', $this->buildTemplatesTable($this->input->get->recurse));
+		$fMods = $this->wrapInputfieldMarkup("installedmodules", $this->buildModulesTable());
+		// Uninstalled Modules
+		$uMods = $this->wrapInputfieldMarkup("uninstalledmodules", $this->buildUninstalledModulesTable());
+		// Core Classes
+		$fCore = $this->wrapInputfieldMarkup("coreclasses", $this->buildCoreTable());
+		// Template Files
+		$fTpls = $this->wrapInputfieldMarkup("templatefiles", $this->buildTemplatesTable($this->input->get->recurse));
 
 		return $this->modules->get('JqueryWireTabs')->render([
 			$this->_("Installed Modules")		=>	$fMods->render(),
@@ -88,6 +108,19 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		]);
 	}
 	
+	/**
+	 * Helper method to wrap the passed HTML snipped in an InputfieldMarkup
+	 */
+	protected function wrapInputfieldMarkup($name, $html) {
+		$f = $this->wire('modules')->get("InputfieldMarkup");
+		$f->attr('name', $name);
+		$f->attr('value', $html);
+		return $f;
+	}
+	
+	/**
+	 * Render tables for installed site and core modules
+	 */
 	public function ___buildModulesTable() {
 		
 		$out = "";
@@ -119,44 +152,22 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		
 		$tbl = $this->modules->get("MarkupAdminDataTable");
 		$tbl->setEncodeEntities(false);
-		
-		$tbl->headerRow([
-			$this->_("Module"),
-			$this->_("Title"),
-			$this->_("Version"),
-			$this->_("Action")
-		]);
+		$tbl->headerRow($this->headerTemplateModules);
 		
 		foreach($siteModules as $className => $info) {
-			$tbl->row([
-				$className,
-				$info['title'],
-				$info['version'],
-				$this->docLink($className, '', $this->_("View"))
-			]);
+			$tbl->row([ $className, $info['title'], $info['version'], $this->docLink($className, '', $this->_("View")) ]);
 		}
-		
+
 		$out .= $tbl->render();
 
 		$out .= "<h2>" . $this->_("Wire (Core) Modules") . "</h2>";
 		
 		$tbl = $this->modules->get("MarkupAdminDataTable");
 		$tbl->setEncodeEntities(false);
-		
-		$tbl->headerRow([
-			$this->_("Module"),
-			$this->_("Title"),
-			$this->_("Version"),
-			$this->_("Action")
-		]);
+		$tbl->headerRow($this->headerTemplateModules);
 		
 		foreach($wireModules as $className => $info) {
-			$tbl->row([
-				$className,
-				$info['title'],
-				$info['version'],
-				$this->docLink($className, '', $this->_("View"))
-			]);
+			$tbl->row([	$className,	$info['title'],	$info['version'], $this->docLink($className, '', $this->_("View")) ]);
 		}
 		
 		$out .= $tbl->render();
@@ -164,31 +175,27 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $out;
 	}
 	
-	
+	/**
+	 * Render tables for not installed site and core modules
+	 */
 	public function ___buildUninstalledModulesTable() {
 		
 		$out = "";
 
 		$siteModules = $this->getFilesRecursive($this->config->paths->siteModules, ".module");
 		$coreModules = $this->getFilesRecursive($this->config->paths->modules, ".module");
+		ksort($siteModules);
+		ksort($coreModules);
 		
 		// Site modules
 		$out .= "<h2>" . $this->_("Site Modules") . "</h2>";
 		
 		$tbl = $this->modules->get("MarkupAdminDataTable");
-		$tbl->setEncodeEntities(false);
+		$tbl->setEncodeEntities(false);		
+		$tbl->headerRow($this->headerTemplateFiles);
 		
-		$tbl->headerRow([
-			$this->_("File"),
-			$this->_("Action")
-		]);
-		
-		ksort($siteModules);
 		foreach($siteModules as $className => $info) {
-			$tbl->row([
-				$className,
-				$this->docLink($info, $className, $this->_("View"))
-			]);
+			$tbl->row([ $className, $this->docLink($info, $className, $this->_("View")) ]);
 		}
 		
 		$out .= $tbl->render();
@@ -197,14 +204,9 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		$out .= "<h2>" . $this->_("Core Modules") . "</h2>";
 		
 		$tbl = $this->modules->get("MarkupAdminDataTable");
-		$tbl->setEncodeEntities(false);
+		$tbl->setEncodeEntities(false);		
+		$tbl->headerRow($this->headerTemplateFiles);
 		
-		$tbl->headerRow([
-			$this->_("File"),
-			$this->_("Action")
-		]);
-		
-		ksort($coreModules);
 		foreach($coreModules as $className => $info) {
 			$tbl->row([
 				$className,
@@ -217,7 +219,18 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $out;
 	}
 	
-	
+	/**
+	 * Recursively read all filenames with the given ending from the given path
+	 *
+	 * Returns an associative array:
+	 * ```php
+	 * [
+	 *   "filename1" => "path1",
+	 *   "filename2" => "path2",
+	 *   ...
+	 * ];
+	 * ```
+	 */
 	protected function getFilesRecursive($path, $ending) {
 		
 		$files = [];
@@ -243,44 +256,55 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $files;
 	}
 	
+	/**
+	 * Recursively read all filenames with the given ending from the given path
+	 *
+	 * The returned array is sorted by filenames by default.
+	 * If argument $sortpath is true, it is sorted by path first, then by filename.
+	 *
+	 * Returns an array of arrays:
+	 * ```php
+	 * [
+	 *   ["path1", "filename1"],
+	 *   ["path2", "filename2"],
+	 *   ...
+	 * ];
+	 * ```
+	 */
+	protected function getDirectoryFilesRecursive($path, $ending, $sortpath = false) {
+		
+		$files = [];
+		
+		$directory = new \RecursiveDirectoryIterator($this->config->paths->templates);
+		$iterator = new \RecursiveIteratorIterator($directory);
+
+		foreach ($iterator as $info) {
+			
+			if($info->isDir() || substr(strtolower($info->getFilename()), -1 * strlen($ending)) !== strtolower($ending))
+				continue;
+			
+			$path = $info->getPath() . "/";
+			
+			if(strtolower(substr($_SERVER['OS'], 0, 3)) === 'win')
+				$path = str_replace('\\', '/', $path);
+			
+			$files[] = [$path, $info->getFilename()];
+		}
+
+		return $files;
+	}
 	
+	/**
+	 * Render the table of template files
+	 */
 	public function ___buildTemplatesTable($recursive = false) {
 		
 		$files = [];
 		
-		if($recursive) {
-			$directory = new \RecursiveDirectoryIterator($this->config->paths->templates);
-			$iterator = new \RecursiveIteratorIterator($directory);
-
-			foreach ($iterator as $info) {
-				
-				if($info->isDir() || substr(strtolower($info->getFilename()), -4) !== '.php')
-					continue;
-				
-				$path = $info->getPath() . "/";
-				
-				if(strtolower(substr($_SERVER['OS'], 0, 3)) === 'win')
-				$path = str_replace('\\', '/', $path);
-				
-				$files[] = [$path, $info->getFilename()];
-			}
-		} else {
-			$path = $this->config->paths->templates;
-			$dir = opendir($path);
-			while(($file = readdir($dir)) !== false) {
-				if(substr($file,0,1) !== '.' && is_file($path . $file) && substr($file, -4) === '.php') {
-					$files[] = [$path, $file];
-				}
-			}
-		}
-		
-		usort($files, function($a, $b) {
-			$ord = strnatcmp($a[0], $b[0]);
-			if($ord == 0) {
-				$ord = strnatcmp($a[1], $b[1]);
-			}
-			return $ord;
-		});
+		if($recursive)
+			$files = $this->getDirectoryFilesRecursive($this->config->paths->templates, ".php", true);
+		else
+			$files = $this->getDirectoryFilesFlat($this->config->paths->templates, ".php");
 		
 		$tbl = $this->modules->get("MarkupAdminDataTable");
 		$tbl->setEncodeEntities(false);
@@ -309,29 +333,21 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $tbl->render();
 	}
 	
-	
+	/**
+	 * Renders the table for core files (wire/core directory)
+	 */
 	public function ___buildCoreTable() {
 		$out = "";
 		
-		$dir = opendir($this->config->paths->core);
+		$files = $this->getDirectoryFilesFlat($this->config->paths->core, '.php');
 
 		$tbl = $this->modules->get("MarkupAdminDataTable");
 		$tbl->setEncodeEntities(false);
 		
-		$tbl->headerRow([
-			$this->_("File"),
-			$this->_("Action")
-		]);
+		$tbl->headerRow($this->headerTemplateFiles);
 		
-		while(($file = readdir($dir)) !== false) {
-			
-			if(substr($file, 0, 1) == '.' || ! is_file($this->config->paths->core . $file) || ! preg_match('/\\.php$/i', $file))
-				continue;
-			
-			$tbl->row([
-				$file,
-				$this->docLink('CORE', $file, $this->_("View"))
-			]);
+		foreach($files as $f) {
+			$tbl->row([ $f[1], $this->docLink('CORE', $f[1], $this->_("View")) ]);
 		}
 		
 		$out .= $tbl->render();
@@ -339,6 +355,62 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $out;
 	}
 	
+	/**
+	 * Read all filenames with the given ending from the given path
+	 *
+	 * This method does not recurse into subdirectories.
+	 *
+	 * The returned array is sorted by filenames.
+	 *
+	 * Returns an array of arrays:
+	 * ```php
+	 * [
+	 *   ["path1", "filename1"],
+	 *   ["path2", "filename2"],
+	 *   ...
+	 * ];
+	 * ```
+	 */
+	protected function getDirectoryFilesFlat($path, $ending) {
+		$files = [];
+		
+		$dir = opendir($path);
+		while(($file = readdir($dir)) !== false) {
+			if(substr($file, 0, 1) == '.' || ! is_file($path . $file) || ! preg_match('/\\.php$/i', $file))
+				continue;
+			$files[] = [$path, $file];
+		}
+		
+		$this->sortFilesArrayName($files);
+		
+		return $files;
+	}
+	
+	/**
+	 * Sorts the passed array by the second element
+	 */
+	protected function sortFilesArrayName(&$arr) {
+		uasort($arr, function($a, $b) {
+			return strnatcmp($a[1], $b[1]);
+		});
+	}
+
+	/**
+	 * Sorts the passed array by the first, then by the second element
+	 */
+	protected function sortFilesArrayPathFirst(&$arr) {
+		uasort($arr, function($a, $b) {
+			$ord = strnatcmp($a[0], $b[0]);
+			if($ord === 0) {
+				$ord = strnatcmp($a[1], $b[1]);
+			}
+			return $ord;
+		});
+	}
+	
+	/**
+	 * Renders the documentation for the given module or PHP file
+	 */
 	public function ___executeView() {
 
 		require('ModuleApiDocGenerator.php');
@@ -411,7 +483,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				if($clsParsed) {
 					$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
 					if($clsParsed["summary"]) {
-						$out .= "<h3>" . $clsParsed["summary"] . "</h3>";
+						$out .= "<h3>" . htmlentities($clsParsed["summary"]) . "</h3>";
 					}
 					if($clsParsed["description"]) {
 						$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
@@ -422,17 +494,16 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				$out .= "<h3>" . $this->_("Functions") . "</h3>";
 				
 				if(count($cls["functions"])) {
+					
 					$tbl = $this->modules->get("MarkupAdminDataTable");
 					$tbl->setEncodeEntities(false);
-					$tbl->headerRow([
-						$this->_("Function"),
-						$this->_("Description")
-					]);
+					$tbl->headerRow($this->headerTemplateFunctions);
+					
 					foreach($cls["functions"] as $func) {
 						$parsed = $func["parsedComment"];
 						$tbl->row([
-							"<strong>" . $func["name"] . "</strong>( " . $this->renderArgString($func["params"]) . " )",
-							$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+							$this->strong($func["name"]) . "( " . $this->renderArgString($func["params"]) . " )",
+							$this->renderComment($parsed, $tfMd)
 						], ['separator' => true, 'class' => 'rowdarker']);
 						
 					}
@@ -447,7 +518,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				if($clsParsed) {
 					$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
 					if($clsParsed["summary"]) {
-						$out .= "<h3>" . $clsParsed["summary"] . "</h3>";
+						$out .= "<h3>" . htmlentities($clsParsed["summary"]) . "</h3>";
 					}
 					if($clsParsed["description"]) {
 						$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
@@ -459,11 +530,8 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				if(count($cls["properties"])) {
 					$tbl = $this->modules->get("MarkupAdminDataTable");
 					$tbl->setEncodeEntities(false);
-					$tbl->headerRow([
-						$this->_("Property"),
-						$this->_("Static"),
-						$this->_("Description")
-					]);
+					$tbl->headerRow($this->headerTemplateMethods);
+					
 					foreach($cls["properties"] as $prop) {
 						
 						if($prop["visibility"] != "public") continue;
@@ -472,7 +540,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 						$tbl = $tbl->row([
 							'<strong>$' . $prop["name"] . "</strong>",
 							$prop["scope"],
-							$parsed ? ("<strong>" . $parsed["summary"] . "</strong>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]). "</p>" : "")) : ""
+							$this->renderComment($parsed, $tfMd)
 						], ['separator' => true, 'class' => 'rowdarker']);
 					}
 					$out .= $tbl->render();
@@ -483,13 +551,11 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				$hooks = [];
 
 				$out .= "<h3>" . $this->_("Methods") . "</h3>";
+				
 				$tbl = $this->modules->get("MarkupAdminDataTable");
 				$tbl->setEncodeEntities(false);
-				$tbl->headerRow([
-					$this->_("Method"),
-					$this->_("Static"),
-					$this->_("Description")
-				]);
+				$tbl->headerRow($this->headerTemplateMethods);
+				
 				foreach($cls["methods"] as $meth) {
 					
 					if($meth["visibility"] != "public") continue;
@@ -500,16 +566,17 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 
 					$parsed = $meth["parsedComment"];
 					$tbl->row([
-						"<strong>" . $meth["name"] . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
+						$this->strong($meth["name"]) . "( " . $this->renderArgString($meth["params"]) . " )",
 						$meth["scope"],
-						$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+						$this->renderComment($parsed, $tfMd)
 					], ['separator' => true, 'class' => 'rowdarker']);
 					
 					if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
+						$ret = $parsed["returns"];
 						$tbl->row([
 							'',
 							$this->_("returns:"),
-							$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
+							$ret["type"] . " " . $this->em($ret["text"])
 						]);
 					}
 					
@@ -518,7 +585,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 							$tbl->row([
 								'',
 								$this->_("argument:"),
-								" <em>" . $prm["type"] . "</em> <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
+								" " . $this->em($prm["type"]) . " <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
 							]);
 						}
 					}
@@ -538,16 +605,16 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 						
 						$parsed = $meth["parsedComment"];
 						$tbl->row([
-							"<strong>" . substr($meth["name"], 3) . "</strong>( " . $this->renderArgString($meth["params"]) . " )",
+							$this->strong(substr($meth["name"], 3)) . "( " . $this->renderArgString($meth["params"]) . " )",
 							$meth["scope"],
-							$parsed ? ("<p>" . $parsed["summary"] . "</p>" . ($parsed["description"] ? "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>" : "")) : ""
+							$this->renderComment($parsed, $tfMd)
 						], ['separator' => true, 'class' => 'rowdarker']);
 
 						if($parsed && $parsed["returns"] && $parsed["returns"]["type"] ) {
 							$tbl->row([
 								'',
 								$this->_("return:"),
-								$parsed["returns"]["type"] . " <em>" . $parsed["returns"]["text"] . "</em>"
+								$parsed["returns"]["type"] . " " . $this->em($parsed["returns"]["text"])
 							]);
 						}
 						
@@ -556,7 +623,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 								$tbl->row([
 									'',
 									$this->_("argument:"),
-									" <em>" . $prm["type"] . "</em> <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
+									" " .$this->em($prm["type"]) . " <span style='color: blue;'>" . $prm["name"] . "</span>" . ($prm["text"] ? " - " . $prm["text"] : "")
 								]);
 							}
 						}
@@ -564,31 +631,79 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					$out .= $tbl->render();
 				}
 
-				if($clsParsed && $clsParsed["todo"]) {
-					$out .= "<div class='mad-todo'>"
-							. "<h3>" . $this->_("Open todos") . "</h3><ul>"
-							. implode("\n", array_map(function($line) use($tfMd) {
-								return "<li>" . $tfMd->markdown(htmlentities($line)) . "</li>";
-							}, $clsParsed["todo"]))
-							. "</ul></div>";
-				}
+				$out .= $this->renderTodoList($clsParsed, $tfMd);
 			}
 		}
 		
 		return $out;
 	}
 	
+	/**
+	 * Render the list of todos from the parsed comment
+	 */
+	protected function renderTodoList($parsed, TextformatterMarkdownExtra $tfMd) {
+		
+		if(! $parsed || !$parsed["todo"])
+			return "";
+		
+		$out = "<div class='mad-toto'>";
+		$out .= "<h3>" . $this->_("Open todos") . "</h3>";
+		$out .= "<ul>";
+		
+		foreach($parsed["todo"] as $line) {
+			$out .= "<li>" . $tfMd->markdown(htmlentities($line)) . "</li>";
+		}
+		
+		$out .= "</ul>";
+		$out .= "</div>";
+		
+		return $out;
+	}
+	
+	/**
+	 * Wrap the given HTML snippet in <strong> tags
+	 */
+	protected function strong($str) {
+		return "<strong>$str</strong>";
+	}
+	
+	/**
+	 * Wrap the given HTML snippet in <em> tags
+	 */
+	protected function em($str) {
+		return "<em>$str</em>";
+	}
+	
+	/**
+	 * Renders the parsed comment's summary and description
+	 */
+	protected function renderComment($parsed, TextFormatterMarkdownExtra $tfMd) {
+		$out = "";
+		if($parsed) {
+			$out .= "<p>" . htmlentities($parsed["summary"]) . "</p>";
+			if($parsed["description"]) {
+				$out .= "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>";
+			}
+		}
+		return $out;
+	}
+	
+	/**
+	 * Renders the parsed argument definitions for use in a method signature
+	 */
 	protected function renderArgString($params) {
 		return implode(', ', array_map(
 			function($param) {
-				return "<em>" . $param["type"] . "</em>" .
+				return $this->em($param["type"]) .
 					   ' <span style="color: blue;">$' . $param["name"] . "</span>" . ($param["default"] ? " = " . $param["default"] : "");
 			},
 			$params
 		));
 	}
 	
-	
+	/**
+	 * We only output a notice on the configuration page that PHP-Parser is needed to run this module
+	 */
 	public static function getModuleConfigInputfields($data) {
 		$wrap = new InputfieldWrapper();
 		

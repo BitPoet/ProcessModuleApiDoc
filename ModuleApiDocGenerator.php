@@ -139,20 +139,48 @@ class ModuleApiDocGenerator {
 		foreach($this->ast as $ast) {
 			if($this->ast[0] instanceof \PhpParser\Node\Stmt\Namespace_) {
 				$ns = implode('\\', $ast->name->parts);
+				$nsComment = $this->getComment($ast);
+				$nsParsedComment = $this->parseComment($nsComment, true);
 				$startNode = $ast->stmts;
 			} else {
 				$ns = '';
 				$startNode = [$ast];
+				$nsComment = '';
+				$nsParsedComment = [];
 			}
-			
+
 			foreach($startNode as $node) {
 				if($node instanceof \PhpParser\Node\Stmt\Class_) {
 					$this->classes[$node->name->name] = $this->buildClassDoc($ns, $node);
 				}
 			}
 		}
+
+		if(count($this->classes) === 0) {
+			$this->classes["NOCLASS"] = $this->buildFunctionDoc($ns, $startNode, $nsComment, $nsParsedComment);
+		}
 		
 		return $this->classes;
+	}
+	
+	protected function buildFunctionDoc($ns, $root, $nsComment, $nsParsedComment) {
+		$functions = [];
+		
+		foreach($root as $node) {
+			if($node instanceof \PhpParser\Node\Stmt\Function_) {
+				$comment = $this->getComment($node);
+				$parsedComment = $this->parseComment($comment, true);
+				$func = $this->getFunction($node);
+				$functions[$func['name']] = $func;
+			}
+		}
+		
+		return [
+			"namespace"		=>	$ns,
+			"functions"		=>	$functions,
+			"comment"		=>	$nsComment,
+			"parsedComment"	=>	$nsParsedComment
+		];
 	}
 	
 	/**
@@ -204,7 +232,7 @@ class ModuleApiDocGenerator {
 	
 	protected function getComment($node) {
 		$comments = $node->getAttribute('comments');
-		$comment = (is_array($comments) && count($comments) > 0) ? $comments[0]->getText() : '';
+		$comment = (is_array($comments) && count($comments) > 0) ? $comments[count($comments) - 1]->getText() : '';
 		
 		return $comment;
 	}
@@ -363,6 +391,24 @@ class ModuleApiDocGenerator {
 			"comment"		=>	$comment,
 			"parsedComment"	=>	$parsedComment
 		];
+	}
+	
+	protected function getFunction($node) {
+		$name = $node->name->name;
+		$type = $node->returnType ? $node->returnType->name : '';
+		$params = $this->getParams($node->params);
+
+		$comment = $this->getComment($node);
+		$parsedComment = $this->parseComment($comment, true);
+		
+		return [
+			"name"			=>	$name,
+			"type"			=>	$type,
+			"params"		=>	$params,
+			"comment"		=>	$comment,
+			"parsedComment"	=>	$parsedComment
+		];
+		
 	}
 	
 	protected function getParams($paramsArr) {
