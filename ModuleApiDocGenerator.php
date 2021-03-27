@@ -79,7 +79,8 @@ use PhpParser\ParserFactory;
  *     "type"           => string, // Argument type, may be empty
  *     "name"           => string, // Argument name, may be empty
  *     "text"			=> string, // Return value description, may be empty
- *   ]
+ *   ],
+ *   "todo"          => [string, ...]
  * ];
  * ```
  */
@@ -161,7 +162,7 @@ class ModuleApiDocGenerator {
 	 */
 	protected function buildClassDoc($ns, $clsNode) {
 		$comment = $this->getComment($clsNode);
-		$parsedComment = $this->parseComment($comment);
+		$parsedComment = $this->parseComment($comment, true);
 		$properties = [];
 		$methods = [];
 		
@@ -214,7 +215,8 @@ class ModuleApiDocGenerator {
 		
 		$defs = [
 			"returns"		=>	false,
-			"params"		=>	[]
+			"params"		=>	[],
+			"todo"			=>	null
 		];
 		
 		$stripped = preg_replace('~^\\s+\\* ~m', '', $comment);
@@ -243,7 +245,8 @@ class ModuleApiDocGenerator {
 			"summary"		=>	$summary,
 			"returns"		=>	$defs["returns"],
 			"params"		=>	$defs["params"],
-			"description"	=>	implode("\n", $lines)
+			"description"	=>	implode("\n", $lines),
+			"todo"			=>	$defs["todo"]
 		];
 		
 		return $ret;
@@ -275,6 +278,7 @@ class ModuleApiDocGenerator {
 		$params = [];
 		$returns = false;
 		$outlines = [];
+		$todos = [];
 		foreach($lines as $line) {
 			if(preg_match('/^\\s*@param (\\S+)(?:\\s+)?(\\$\\S+)?(?:\\s+)?(.*)?$/', $line, $match)) {
 				$params[] = [
@@ -282,13 +286,17 @@ class ModuleApiDocGenerator {
 					"name"		=>	$match[2],
 					"text"		=>	$match[3]
 				];
-			} elseif(preg_match('/\\s*@return\\s+(\\S+)(?:\\s+)?(.*)?$/', $line, $match)) {
+			} elseif(preg_match('/^\\s*@return\\s+(\\S+)(?:\\s+)?(.*)?$/', $line, $match)) {
 				$returns = [
 					"type"		=> $match[1],
 					"text"		=> $match[2]
 				];
-			} elseif(preg_match('/\\s*@/', $line)) {
+			} elseif(preg_match('/^\\s*@todo:?\\s?(.*)?$/', $line, $match)) {
+				$todos[] = $match[1];
+			} elseif(preg_match('/^\\s*@/', $line)) {
 				// Do nothing, strip definitions we don't recognize
+			} elseif(preg_match('/^\\s*FIXED\\s.*$/', $line)) {
+				// Do nothing, strip Ryan's info about fixed issues
 			} else {
 				$outlines[] = $line;
 			}
@@ -298,7 +306,8 @@ class ModuleApiDocGenerator {
 		
 		return [
 			"params"		=>	$params,
-			"returns"		=>	$returns
+			"returns"		=>	$returns,
+			"todo"			=>	$todos
 		];
 	}
 
