@@ -139,6 +139,7 @@ class ModuleApiDocGenerator {
 			$lines[$i] = preg_replace('~^\\s+\\*\\s*$~', '', $lines[$i]);
 		}
 		
+		$this->removeSpecialPwDocComments($lines);
 		$this->forwardLinesToNonEmpty($lines);
 		
 		if(count($lines) > 0) {
@@ -173,6 +174,16 @@ class ModuleApiDocGenerator {
 		while(count($lines) > 0 && $lines[count($lines)-1] === '') {
 			array_pop($lines);
 		}
+	}
+	
+	protected function removeSpecialPwDocComments(&$lines) {
+		$outlines = [];
+		foreach($lines as $line) {
+			if(! preg_match('/^\\s*#pw-/', $line))
+				$outlines[] = $line;
+		}
+		
+		array_splice($lines, 0, count($lines), $outlines);
 	}
 	
 	protected function extractDefinitionsFromComment(&$lines) {

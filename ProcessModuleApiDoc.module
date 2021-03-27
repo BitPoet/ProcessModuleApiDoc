@@ -6,7 +6,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.0.1",
+			"version"		=>	"0.0.2",
 			"requires"		=>	["TextformatterMarkdownExtra"],
 			"page"			=>	[
 				"name"			=>	"moduledoc",
@@ -16,10 +16,48 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		];
 	}
 	
+	public function init() {
+		parent::init();
+		$this->wire('modules')->get("JqueryWireTabs");
+	}
+	
 	public function ___execute() {
 		
-		return $this->buildModulesTable();
+		$form = $this->wire('modules')->get("InputfieldForm");
+		$form->name = 'instmodform';
 		
+		$tabWrapper = new InputfieldWrapper();
+		$tabWrapper->attr('id', 'ApiDocWrap');
+		
+		// Installed Modules
+		$tab = new InputfieldWrapper();
+		$tab->attr('id', 'tabInstalledModules');
+		$tab->attr('title', $this->_("Installed Modules"));
+		$tab->attr('class', 'WireTab');
+		
+		$f = $this->wire('modules')->get("InputfieldMarkup");
+		$f->attr('name', 'installedmodules');
+		$f->attr('value', $this->buildModulesTable());
+		$tab->add($f);
+		
+		$tabWrapper->add($tab);
+		
+		// Core Classes
+		$tab = new InputfieldWrapper();
+		$tab->attr('id', 'tabCoreClasses');
+		$tab->attr('title', $this->_("Core Classes"));
+		$tab->attr('class', 'WireTab');
+		
+		$f = $this->wire('modules')->get("InputfieldMarkup");
+		$f->attr('name', 'coreclasses');
+		$f->attr('value', $this->buildCoreTable());
+		$tab->add($f);
+		
+		$tabWrapper->add($tab);
+		
+		$form->add($tabWrapper);
+		
+		return $form->render();
 	}
 	
 	public function ___buildModulesTable() {
@@ -94,6 +132,34 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $out;
 	}
 	
+	public function ___buildCoreTable() {
+		$out = "";
+		
+		$dir = opendir($this->config->paths->core);
+
+		$tbl = $this->modules->get("MarkupAdminDataTable");
+		$tbl->setEncodeEntities(false);
+		
+		$tbl->headerRow([
+			$this->_("File"),
+			$this->_("Action")
+		]);
+		
+		while(($file = readdir($dir)) !== false) {
+			
+			if(substr($file, 0, 1) == '.' || ! is_file($this->config->paths->core . $file) || ! preg_match('/\\.php$/i', $file))
+				continue;
+			
+			$tbl->row([
+				$file,
+				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module=CORE&filename={$file}' title='" . $this->_("View") . "'> </a>"
+			]);
+		}
+		
+		$out .= $tbl->render();
+		
+		return $out;
+	}
 	
 	public function ___executeView() {
 
@@ -104,11 +170,16 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		$moduleName = $this->input->get->module;
 		$moduleFile = $this->input->get->filename;
 		
-		$modulePath = $this->config->paths->$moduleName;
-		if($moduleFile) {
-			$path = $this->config->paths->$moduleName . $moduleFile;
+		if($moduleName === "CORE") {
+			$modulePath = $this->config->paths->core;
+			$path = $modulePath . $moduleFile;
 		} else {
-			$path = $this->modules->getModuleFile($moduleName);
+			$modulePath = $this->config->paths->$moduleName;
+			if($moduleFile) {
+				$path = $this->config->paths->$moduleName . $moduleFile;
+			} else {
+				$path = $this->modules->getModuleFile($moduleName);
+			}
 		}
 		
 		if(!$path) {
@@ -119,18 +190,20 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		
 		$otherfiles = [];
 		
-		$dir = opendir($modulePath);
-		while(($file = readdir($dir)) !== false) {
-			if(
-				is_file($modulePath . $file)
-				&& preg_match('/(php|module)$/i', $file)
-				&& $file !== $moduleFile
-				&& !($moduleFile == null && substr($path, -1 * strlen($file)) == $file)
-			) {
-				$otherfiles[] = $file;
+		if($moduleName !== "CORE") {
+			$dir = opendir($modulePath);
+			while(($file = readdir($dir)) !== false) {
+				if(
+					is_file($modulePath . $file)
+					&& preg_match('/(php|module)$/i', $file)
+					&& $file !== $moduleFile
+					&& !($moduleFile == null && substr($path, -1 * strlen($file)) == $file)
+				) {
+					$otherfiles[] = $file;
+				}
 			}
 		}
-		
+				
 		if($otherfiles) {
 			$out .= "<div><h4>" . $this->_("Other PHP files in this module's path") . "</h4><ul>";
 			foreach($otherfiles as $file) {
