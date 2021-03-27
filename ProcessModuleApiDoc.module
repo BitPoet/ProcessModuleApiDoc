@@ -28,7 +28,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.0.8",
+			"version"		=>	"0.0.9",
 			"requires"		=>	["TextformatterMarkdownExtra", "ProcessWire>=3.0.127"],
 			"icon"			=>	'file-text-o',
 			"page"			=>	[
@@ -486,7 +486,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 						$out .= "<h3>" . htmlentities($clsParsed["summary"]) . "</h3>";
 					}
 					if($clsParsed["description"]) {
-						$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
+						$out .= "" . $this->highlight($tfMd->markdown($clsParsed["description"])) . "";
 					}
 					$out .= "</div>";
 				}
@@ -521,7 +521,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 						$out .= "<h3>" . htmlentities($clsParsed["summary"]) . "</h3>";
 					}
 					if($clsParsed["description"]) {
-						$out .= "" . $tfMd->markdown($clsParsed["description"]) . "";
+						$out .= "" . $this->highlight($tfMd->markdown($clsParsed["description"])) . "";
 					}
 					$out .= "</div>";
 				}
@@ -682,10 +682,17 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		if($parsed) {
 			$out .= "<p>" . htmlentities($parsed["summary"]) . "</p>";
 			if($parsed["description"]) {
-				$out .= "<p style='white-space: pre-line;'>" . $tfMd->markdown($parsed["description"]) . "</p>";
+				$out .= "<p style='white-space: pre-line;'>" . $this->highlight($tfMd->markdown($parsed["description"])) . "</p>";
 			}
 		}
 		return $out;
+	}
+	
+	protected function highlight($html) {
+		$highlighted = preg_replace_callback('~(<code>)(.*?)(</code>)~smi', function($match) {
+			return $match[1] . highlight_string("<?php " . str_replace(['&lt;', '&gt;'], ['<', '>'], $match[2]), true) . $match[3];
+		}, $html);
+		return preg_replace('~(<code><span[^>]*>\s*<span[^>]*>)(&lt;\?php(\s|&nbsp;)*)~smi', '$1', $highlighted);
 	}
 	
 	/**
