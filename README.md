@@ -6,6 +6,7 @@ Adds a "Module API Docs" menu entry in the ProcessWire backend that lets you vie
 
 ## Requirements
 
+- ProcessWire >= 3.0.127
 - TextformatterMarkdownExtra (shipped with ProcessWire)
 - PHP-Parser (see Installation further down)
 
