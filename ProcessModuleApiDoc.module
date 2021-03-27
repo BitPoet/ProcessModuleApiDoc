@@ -28,7 +28,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.0.9",
+			"version"		=>	"0.1.0",
 			"requires"		=>	["TextformatterMarkdownExtra", "ProcessWire>=3.0.127"],
 			"icon"			=>	'file-text-o',
 			"page"			=>	[
@@ -46,7 +46,11 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 	 */
 	public function init() {
 		parent::init();
-		$this->wire('modules')->get("JqueryWireTabs");
+		
+		$jwt = $this->wire('modules')->get("JqueryWireTabs");
+		$settings = $this->config->js('JqueryWireTabs');
+		$settings["rememberTabs"] = JqueryWireTabs::rememberTabsAlways;
+		$this->config->js('JqueryWireTabs', $settings);
 		
 		$this->set("headerTemplateModules", [
 			$this->_("Module"),
@@ -58,13 +62,25 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$this->_("File"),
 			$this->_("Action")
 		]);
-		$this->set("headerTemplateMethods", [
+		$this->set("headerTemplateProperties", [
 			$this->_("Property"),
+			$this->_("Visibility"),
+			$this->_("Static"),
+			$this->_("Description")
+		]);
+		$this->set("headerTemplateMethods", [
+			$this->_("Method"),
+			$this->_("Visibility"),
 			$this->_("Static"),
 			$this->_("Description")
 		]);
 		$this->set("headerTemplateFunctions", [
 			$this->_("Function"),
+			$this->_("Description")
+		]);
+		$this->set("headerTemplateHooks", [
+			$this->_("Hookable Method"),
+			$this->_("Static"),
 			$this->_("Description")
 		]);
 	}
@@ -330,7 +346,23 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$oldPath = $f[0];
 		}
 
-		return $tbl->render();
+		$additional = "";
+
+		if($recursive) {
+			$btn = $this->modules->get("InputfieldButton");
+			$btn->attr('id+name', 'recurse');
+			$btn->attr('href', $this->page->url);
+			$btn->text = $this->_("Turn off recursion");
+			$additional .= $btn->render();
+		} else {
+			$btn = $this->modules->get("InputfieldButton");
+			$btn->attr('id+name', 'recurse');
+			$btn->attr('href', $this->page->url . '?recurse=1');
+			$btn->text = $this->_("Recurse into subdirectories");
+			$additional .= $btn->render();
+		}
+
+		return $tbl->render() . $additional;
 	}
 	
 	/**
@@ -442,7 +474,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		}
 		
 		$out .= "<h4>" . sprintf($this->_("Viewing Documentation for File %s"), $path) . "</h4>";
-		
+
 		$otherfiles = [];
 		
 		if($moduleName !== "CORE") {
@@ -460,11 +492,37 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		}
 				
 		if($otherfiles) {
-			$out .= "<div><h4>" . $this->_("Other PHP files in this module's path") . "</h4><ul>";
+			$wrap = new InputfieldWrapper();
+			
+			$f = $this->modules->get("InputfieldMarkup");
+			$f->label = $this->_("Other PHP files in this module's path");
+			$f->collapsed = Inputfield::collapsedYes;
+			
+			$markup = "<ul>";
 			foreach($otherfiles as $file) {
-				$out .= "<li><a href='{$this->page->url}view?module={$moduleName}&filename={$file}'>{$file}</a></li>";
+				$markup .= "<li><a href='{$this->page->url}view?module={$moduleName}&filename={$file}'>{$file}</a></li>";
 			}
-			$out .= "</ul></div>";
+			$markup .= "</ul>";
+			
+			$f->attr('value', $markup);
+			$wrap->add($f);
+			$out .= $wrap->render();
+		}
+		
+		$protected = $this->input->get->protected;
+		
+		if($protected) {
+			$btn = $this->modules->get("InputfieldButton");
+			$btn->attr('id+name', 'protected');
+			$btn->attr('href', $this->page->url . "view?module={$moduleName}&filename={$moduleFile}");
+			$btn->text = $this->_("Show only public members");
+			$out .= $btn->render();
+		} else {
+			$btn = $this->modules->get("InputfieldButton");
+			$btn->attr('id+name', 'protected');
+			$btn->attr('href', $this->page->url . "view?module={$moduleName}&filename={$moduleFile}&protected=1");
+			$btn->text = $this->_("Display protected members too");
+			$out .= $btn->render();
 		}
 		
 		$gen = new ModuleApiDocGenerator($path);
@@ -481,7 +539,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				
 				$clsParsed = $cls["parsedComment"];
 				if($clsParsed) {
-					$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
+					$out .=  "<div class='markdown-wrap'>";
 					if($clsParsed["summary"]) {
 						$out .= "<h3>" . htmlentities($clsParsed["summary"]) . "</h3>";
 					}
@@ -516,7 +574,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				
 				$clsParsed = $cls["parsedComment"];
 				if($clsParsed) {
-					$out .=  "<div style='border: 1px solid gray; padding: 0.5em;' class='markdown-wrap'>";
+					$out .=  "<div class='markdown-wrap'>";
 					if($clsParsed["summary"]) {
 						$out .= "<h3>" . htmlentities($clsParsed["summary"]) . "</h3>";
 					}
@@ -530,15 +588,16 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				if(count($cls["properties"])) {
 					$tbl = $this->modules->get("MarkupAdminDataTable");
 					$tbl->setEncodeEntities(false);
-					$tbl->headerRow($this->headerTemplateMethods);
+					$tbl->headerRow($this->headerTemplateProperties);
 					
 					foreach($cls["properties"] as $prop) {
 						
-						if($prop["visibility"] != "public") continue;
+						if(!$protected && $prop["visibility"] != "public") continue;
 						
 						$parsed = $prop["parsedComment"];
 						$tbl = $tbl->row([
 							'<strong>$' . $prop["name"] . "</strong>",
+							$prop["visibility"],
 							$prop["scope"],
 							$this->renderComment($parsed, $tfMd)
 						], ['separator' => true, 'class' => 'rowdarker']);
@@ -558,7 +617,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				
 				foreach($cls["methods"] as $meth) {
 					
-					if($meth["visibility"] != "public") continue;
+					if(!$protected && $meth["visibility"] != "public") continue;
 					if(substr($meth["name"], 0, 3) == '___') {
 						$hooks[] = $meth;
 						continue;
@@ -567,6 +626,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					$parsed = $meth["parsedComment"];
 					$tbl->row([
 						$this->strong($meth["name"]) . "( " . $this->renderArgString($meth["params"]) . " )",
+						$meth["visibility"],
 						$meth["scope"],
 						$this->renderComment($parsed, $tfMd)
 					], ['separator' => true, 'class' => 'rowdarker']);
@@ -596,11 +656,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 					$out .= "<h3>" . $this->_("Hookable Methods") . "</h3>";
 					$tbl = $this->modules->get("MarkupAdminDataTable");
 					$tbl->setEncodeEntities(false);
-					$tbl->headerRow([
-						$this->_("Method"),
-						$this->_("Static"),
-						$this->_("Description")
-					]);
+					$tbl->headerRow($this->headerTemplateHooks);
 					foreach($hooks as $meth) {
 						
 						$parsed = $meth["parsedComment"];
