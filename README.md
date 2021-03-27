@@ -58,6 +58,6 @@ This module ships with a composer.json file for PHP-Parser, so installation shou
 
 The module uses PHP-Parser behind the scenes to create an abstract syntax tree for the selected PHP file. That syntax tree is then walked and normalized to create a representation of namespaces, classes, methods and properties. Additionally, comments are parsed in PHP Doc style.
 
-## Cudos
+## Kudos
 
 Big thanks go to [Nikita Popov](https://github.com/nikic) who built [PHP-Parser](https://github.com/nikic/PHP-Parser).
