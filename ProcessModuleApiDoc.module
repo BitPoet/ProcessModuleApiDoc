@@ -21,13 +21,15 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 
 	protected $seenPaths = [];
 	protected $uninstalled = [];
+	
+	protected $fileDocLinkTemplate = "<a class='fa fa-file-text-o' href='%sview?module=%s&filename=%s' title='%s'> </a>";
 
 	public static function getModuleInfo() {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.0.6",
-			"requires"		=>	["TextformatterMarkdownExtra"],
+			"version"		=>	"0.0.7",
+			"requires"		=>	["TextformatterMarkdownExtra", "ProcessWire>=3.0.127"],
 			"page"			=>	[
 				"name"			=>	"moduledoc",
 				"parent"		=>	"setup",
@@ -39,6 +41,16 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 	public function init() {
 		parent::init();
 		$this->wire('modules')->get("JqueryWireTabs");
+	}
+
+	protected function docLink($classname, $filename, $title) {
+		return sprintf(
+			$this->fileDocLinkTemplate,
+			$this->page->url,
+			rawurlencode($classname),
+			rawurlencode($filename),
+			$title
+		);
 	}
 
 	/**
@@ -94,6 +106,9 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			}
 		}
 		
+		ksort($siteModules);
+		ksort($wireModules);
+
 		$out .= "<p> </p><div style='border: 1px solid gray; padding: 0.5em;'>" .
 				"<p>" . $this->_("Click on the sheet symbol to the right of a class to view an on-the-fly generated documentation for the module.") . "</p>" .
 				"<p>" . $this->_("Once there, you can also view the documentation for other PHP / module files in the same directory.") . "</p>" .
@@ -111,13 +126,12 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$this->_("Action")
 		]);
 		
-		ksort($siteModules);
 		foreach($siteModules as $className => $info) {
 			$tbl->row([
 				$className,
 				$info['title'],
 				$info['version'],
-				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$className}' title='" . $this->_("View") . "'> </a>"
+				$this->docLink($className, '', $this->_("View"))
 			]);
 		}
 		
@@ -135,13 +149,12 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$this->_("Action")
 		]);
 		
-		ksort($wireModules);
 		foreach($wireModules as $className => $info) {
 			$tbl->row([
 				$className,
 				$info['title'],
 				$info['version'],
-				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$className}' title='" . $this->_("View") . "'> </a>"
+				$this->docLink($className, '', $this->_("View"))
 			]);
 		}
 		
@@ -173,7 +186,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		foreach($siteModules as $className => $info) {
 			$tbl->row([
 				$className,
-				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$info}&filename={$className}' title='" . $this->_("View") . "'> </a>"
+				$this->docLink($info, $className, $this->_("View"))
 			]);
 		}
 		
@@ -194,7 +207,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		foreach($coreModules as $className => $info) {
 			$tbl->row([
 				$className,
-				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$info}&filename={$className}' title='" . $this->_("View") . "'> </a>"
+				$this->docLink($info, $className, $this->_("View"))
 			]);
 		}
 		
@@ -287,7 +300,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			}
 			$tbl->row([
 				$f[1],
-				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$f[0]}&filename={$f[1]}' title='" . $this->_("View") . "'> </a>"
+				$this->docLink($f[0], $f[1], $this->_("View"))
 			]);
 			$oldPath = $f[0];
 		}
@@ -316,7 +329,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			
 			$tbl->row([
 				$file,
-				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module=CORE&filename={$file}' title='" . $this->_("View") . "'> </a>"
+				$this->docLink('CORE', $file, $this->_("View"))
 			]);
 		}
 		
