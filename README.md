@@ -28,9 +28,10 @@ The documentation viewer displays the following information:
 - Public class properties with default value types
 - Public class methods with return type and arguments (name, type, default value), and whether a method is static
 - Hookable methods (with the same information detail as methods)
-- Functions with return type and arguments (name, type, default value
+- Functions with return type and arguments (name, type, default value)
 
 For each of those, any summary and description found in PHP Doc style comments is also displayed. Descriptions containing markdown are formatted accordingly.
+Included PHP snippets are highlighted.
 
 ## Downsides
 
