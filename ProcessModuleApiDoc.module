@@ -19,11 +19,14 @@
  
 class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 
+	protected $seenPaths = [];
+	protected $uninstalled = [];
+
 	public static function getModuleInfo() {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.0.2",
+			"version"		=>	"0.0.3",
 			"requires"		=>	["TextformatterMarkdownExtra"],
 			"page"			=>	[
 				"name"			=>	"moduledoc",
@@ -37,44 +40,34 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		parent::init();
 		$this->wire('modules')->get("JqueryWireTabs");
 	}
-	
+
+	/**
+	 * Default handler for Process
+	 *
+	 * Outputs an overview of installed modules and core classes along with links to the docs.
+	 *
+	 * @return string HTML
+	 */
 	public function ___execute() {
 		
-		$form = $this->wire('modules')->get("InputfieldForm");
-		$form->name = 'instmodform';
-		
-		$tabWrapper = new InputfieldWrapper();
-		$tabWrapper->attr('id', 'ApiDocWrap');
-		
 		// Installed Modules
-		$tab = new InputfieldWrapper();
-		$tab->attr('id', 'tabInstalledModules');
-		$tab->attr('title', $this->_("Installed Modules"));
-		$tab->attr('class', 'WireTab');
+		$fMods = $this->wire('modules')->get("InputfieldMarkup");
+		$fMods->attr('name', 'installedmodules');
+		$fMods->attr('value', $this->buildModulesTable());
 		
-		$f = $this->wire('modules')->get("InputfieldMarkup");
-		$f->attr('name', 'installedmodules');
-		$f->attr('value', $this->buildModulesTable());
-		$tab->add($f);
-		
-		$tabWrapper->add($tab);
-		
-		// Core Classes
-		$tab = new InputfieldWrapper();
-		$tab->attr('id', 'tabCoreClasses');
-		$tab->attr('title', $this->_("Core Classes"));
-		$tab->attr('class', 'WireTab');
-		
-		$f = $this->wire('modules')->get("InputfieldMarkup");
-		$f->attr('name', 'coreclasses');
-		$f->attr('value', $this->buildCoreTable());
-		$tab->add($f);
-		
-		$tabWrapper->add($tab);
-		
-		$form->add($tabWrapper);
-		
-		return $form->render();
+		$uMods = $this->wire('modules')->get("InputfieldMarkup");
+		$uMods->attr('name', 'uninstalledmodules');
+		$uMods->attr('value', $this->buildUninstalledModulesTable());
+
+		$fCore = $this->wire('modules')->get("InputfieldMarkup");
+		$fCore->attr('name', 'coreclasses');
+		$fCore->attr('value', $this->buildCoreTable());
+
+		return $this->modules->get('JqueryWireTabs')->render([
+			$this->_("Installed Modules")		=>	$fMods->render(),
+			$this->_("Uninstalled Modules")		=>	$uMods->render(),
+			$this->_("Core Classes")			=>	$fCore->render()
+		]);
 	}
 	
 	public function ___buildModulesTable() {
@@ -92,10 +85,11 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 				} else {
 					$wireModules[$className] = $info;
 				}
+				$this->seenPaths[] = $this->config->paths->$className;
 			}
 		}
 		
-		$out .= "<div style='border: 1px solid gray; padding: 0.5em;'>" .
+		$out .= "<p> </p><div style='border: 1px solid gray; padding: 0.5em;'>" .
 				"<p>" . $this->_("Click on the sheet symbol to the right of a class to view an on-the-fly generated documentation for the module.") . "</p>" .
 				"<p>" . $this->_("Once there, you can also view the documentation for other PHP / module files in the same directory.") . "</p>" .
 				"</div>";
@@ -151,6 +145,87 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return $out;
 	}
 	
+	
+	public function ___buildUninstalledModulesTable() {
+		
+		$out = "";
+
+		$siteModules = $this->getFilesRecursive($this->config->paths->siteModules, ".module");
+		$coreModules = $this->getFilesRecursive($this->config->paths->modules, ".module");
+		
+		// Site modules
+		$out .= "<h2>" . $this->_("Site Modules") . "</h2>";
+		
+		$tbl = $this->modules->get("MarkupAdminDataTable");
+		$tbl->setEncodeEntities(false);
+		
+		$tbl->headerRow([
+			$this->_("File"),
+			$this->_("Action")
+		]);
+		
+		ksort($siteModules);
+		foreach($siteModules as $className => $info) {
+			$tbl->row([
+				$className,
+				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$info}&filename={$className}' title='" . $this->_("View") . "'> </a>"
+			]);
+		}
+		
+		$out .= $tbl->render();
+		
+		// Core modules
+		$out .= "<h2>" . $this->_("Core Modules") . "</h2>";
+		
+		$tbl = $this->modules->get("MarkupAdminDataTable");
+		$tbl->setEncodeEntities(false);
+		
+		$tbl->headerRow([
+			$this->_("File"),
+			$this->_("Action")
+		]);
+		
+		ksort($coreModules);
+		foreach($coreModules as $className => $info) {
+			$tbl->row([
+				$className,
+				"<a class='fa fa-file-text-o' href='{$this->page->url}view?module={$info}&filename={$className}' title='" . $this->_("View") . "'> </a>"
+			]);
+		}
+		
+		$out .= $tbl->render();
+		
+		return $out;
+	}
+	
+	
+	protected function getFilesRecursive($path, $ending) {
+		
+		$files = [];
+		$directory = new \RecursiveDirectoryIterator($path);
+		$iterator = new \RecursiveIteratorIterator($directory);
+
+		foreach ($iterator as $info) {
+			
+			if($info->isDir() || substr(strtolower($info->getFilename()), -1 * strlen($ending)) !== strtolower($ending))
+				continue;
+			
+			$path = $info->getPath() . "/";
+			
+			if(strtolower(substr($_SERVER['OS'], 0, 3)) === 'win')
+				$path = str_replace('\\', '/', $path);
+			
+			if(in_array($path, $this->seenPaths))
+				continue;
+			
+			echo "\n<!-- PATH: $path -->\n";
+			
+			$files[$info->getFilename()] = $path;
+		}
+		
+		return $files;
+	}
+	
 	public function ___buildCoreTable() {
 		$out = "";
 		
@@ -193,11 +268,16 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 			$modulePath = $this->config->paths->core;
 			$path = $modulePath . $moduleFile;
 		} else {
-			$modulePath = $this->config->paths->$moduleName;
-			if($moduleFile) {
-				$path = $this->config->paths->$moduleName . $moduleFile;
+			if(strpos($moduleName, '/') !== false && $moduleFile) {
+				$modulePath = $moduleName;
+				$path = $moduleName . $moduleFile;
 			} else {
-				$path = $this->modules->getModuleFile($moduleName);
+				$modulePath = $this->config->paths->$moduleName;
+				if($moduleFile) {
+					$path = $this->config->paths->$moduleName . $moduleFile;
+				} else {
+					$path = $this->modules->getModuleFile($moduleName);
+				}
 			}
 		}
 		
