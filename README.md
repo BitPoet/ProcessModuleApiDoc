@@ -37,6 +37,10 @@ Included PHP snippets are highlighted.
 
 There aren't any links and dependencies between files and classes to see. That part is what makes the "grown up" tools complicated, slow and memory intensive. This module is intended as a lean solution to take a quick peek at properties, methods and hooks without having to dig through the source code.
 
+## Good to know
+
+This module is not a perfect replacement for the API Reference included with the commercial ProDevTools module! Parts of the inline documentation used to assemble the official API reference cannot be parsed by this module, so they aren't displayed.
+
 ## Installation
 
 This module ships with a composer.json file for PHP-Parser, so installation should be straight forward. You do need to have shell access on the computer where you install this module, though.
