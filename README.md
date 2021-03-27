@@ -2,7 +2,7 @@
 On-the-fly class documentation viewer for the [ProcessWire CMS](https://processwire.com)
 
 ## What it does
-Adds a "Module API Docs" menu entry in the ProcessWire backend that lets you view on-the-fly generated PHP doc for the module class itself and any accompanying PHP files.
+Adds a "Module API Docs" menu entry in the ProcessWire backend that lets you view on-the-fly generated PHP doc for modules and other PHP files.
 
 ## Requirements
 
@@ -25,8 +25,9 @@ The documentation viewer displays the following information:
 
 - Classes
 - Public class properties with default value types
-- Public class methods with return values and arguments (name, type, default value), and whether a method is static
-- Hookable methods with the same information as methods
+- Public class methods with return type and arguments (name, type, default value), and whether a method is static
+- Hookable methods (with the same information detail as methods)
+- Functions with return type and arguments (name, type, default value
 
 For each of those, any summary and description found in PHP Doc style comments is also displayed. Descriptions containing markdown are formatted accordingly.
 
