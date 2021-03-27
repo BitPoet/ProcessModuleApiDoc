@@ -41,6 +41,8 @@ There aren't any links and dependencies between files and classes to see. That p
 
 This module is not a perfect replacement for the API Reference included with the commercial ProDevTools module! Parts of the inline documentation used to assemble the official API reference cannot be parsed by this module, so they aren't displayed.
 
+This module takes a one-size-fits-all approach and is because of that quite selective in what information it extracts (and can extract) from the inline docs.
+
 ## Installation
 
 This module ships with a composer.json file for PHP-Parser, so installation should be straight forward. You do need to have shell access on the computer where you install this module, though.
