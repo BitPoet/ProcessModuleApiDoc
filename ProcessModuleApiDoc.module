@@ -28,7 +28,7 @@ class ProcessModuleApiDoc extends Process implements ConfigurableModule {
 		return [
 			"title"			=>	__("Module Api Doc Viewer", __FILE__),
 			"summary"		=>	__("Generate and view PHPDoc style documentation for site modules", __FILE__),
-			"version"		=>	"0.1.0",
+			"version"		=>	"0.2.0",
 			"requires"		=>	["TextformatterMarkdownExtra", "ProcessWire>=3.0.127"],
 			"icon"			=>	'file-text-o',
 			"page"			=>	[
