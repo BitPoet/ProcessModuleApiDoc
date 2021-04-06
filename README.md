@@ -18,7 +18,9 @@ This module parses and documents PHP files on the fly, so documentation doesn't 
 
 ## Module Status
 
-Alpha - try out at your own risk. Do not use on production systems!
+Beta - try out at your own risk.
+
+This module is best used on development systems only. There may be unforeseeable parsing issues and performance impatcts when using this on a production system. It is designed as a development aid anyway.
 
 ## What it Displays
 
